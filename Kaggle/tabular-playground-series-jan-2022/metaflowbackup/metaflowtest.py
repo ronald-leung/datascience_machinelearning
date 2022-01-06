@@ -212,12 +212,16 @@ class MetaFlowFB(FlowSpec):
         forecast = m.predict(future)
 
         #Saving forecast to metaflow
-        self.forecast = dict(
+        self.forecast_meta = dict(
             index=int(self.index),
             params=self.input,
             productLine = self.input['productLine'],
             forecast = forecast
         )
+        self.forecast_index = int(self.index)
+        self.forecast_params = self.input
+        self.forecast_productLine = self.input['productLine']
+        self.forecast_output = forecast
         
         self.next(self.combine_results)
     
@@ -229,19 +233,56 @@ class MetaFlowFB(FlowSpec):
         """
         
         print("In this step, we should see all the results. Saving it locally.")
-        
-        model_forecast = []
-        for input in inputs:
-            model_forecast.append(input.forecast)
 
-        print("model_forecast", model_forecast)
         
         #By now we should have forecast for each product, using the best param. We need to combine them into one output file
-        # compSubResultDict = {}
-        # for prod in list(df_pivot.columns):
-        #     print("Preparing test submission for  ", prod)
-        #     compSubResultDict[prod] = trainAllData(df_pivot, prod)
+        test_df = pd.read_csv('test.csv')
+        finalResult = pd.DataFrame()
+        for input in inputs:
+            print("Forecast_index", input.forecast_index)
+            print("forecast_params", input.forecast_params)
+            print("forecast_productLine", input.forecast_productLine)
+            print("forecast_output", input.forecast_output)
+            
+            # ???
+#             currForecast = input.forecast
+#             print("Input type is: ", type(input))
+#             for cfkey in currForecast.keys():
+#                 print("Got key: ", cfkey)
+            
+#             print(currForecast.params)
+#             print(currForecast.productLine)
+                
+            # if currForecast.has_key('productLine'):                
+            #     key = currForecast['productLine']
+            #     print("Processing data for ", key)
+            # else:
+            #     print("Somehow this forecast has no productLine")
+                
+            key = input.forecast_productLine
+            country = key.split('_')[0]
+            store = key.split('_')[1]
+            product = key.split('_')[2]
+            curr_test_df = test_df[(test_df['country'] == country) & 
+                                   (test_df['store'] == store) & 
+                                   (test_df['product'] == product)].copy()
+            print('Curr_test_df shape', curr_test_df.shape)
+            curr_test_df = curr_test_df.sort_values('date')
+            print(curr_test_df.head())
+            predResult = input.forecast_output['yhat'][-365:]
+            print(predResult.head())
+            print(predResult.tail())
+            print(len(predResult.values))
+            curr_test_df['num_sold'] = predResult.values
+
+            finalResult = finalResult.append(curr_test_df)
+
+            print('curr_test_df null shape', curr_test_df[curr_test_df['num_sold'].isnull()].shape)
         
+        print("Final result head:")
+        print(finalResult.head())
+        print("Final result tail:")
+        print(finalResult.tail())
         
         self.next(self.end)
     
